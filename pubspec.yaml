@@ -1,0 +1,75 @@
+name: recipe_assistant
+description: "A new Flutter project integrating Unity and recipe features."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.4 <4.0.0'
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.6
+  flutter_unity_widget: ^2022.2.0
+
+  # --- 加入新版 App 需要的依賴項 ---
+  # (以下版本號是目前的穩定版，通常能相容，若 pub get 報錯再調整)
+  http: ^1.2.1
+  path_provider: ^2.1.3
+  record: ^4.4.4 # 記得這個套件需要 minSdkVersion 23 on Android
+  permission_handler: ^11.3.1
+
+  logging: ^1.2.0 # 加入 logging 套件
+  video_player: ^2.8.6 # <--- 加入 video_player (請使用 pub.dev 上的最新版)
+
+  # --- 結束加入 ---
+  smooth_page_indicator: ^1.1.0 # <--- 加入 (請使用 pub.dev 上的最新版)
+
+  audioplayers: ^5.2.1 # <--- 修改為嘗試的舊版本
+  provider: ^6.1.2 # 用於狀態管理
+  shared_preferences: ^2.2.3 # 用於持久化儲存
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+  
+  assets:
+    - assets/images/
+    - assets/videos/
+    - assets/audio/recipe_steps/涼拌小黃瓜/
+    - assets/audio/recipe_steps/奶油蘑菇濃湯/
+    - assets/audio/recipe_steps/蛋炒飯/
+    - assets/audio/recipe_steps/咖啡椰奶凍/
+    - assets/audio/recipe_steps/日式肥牛丼飯/
+    - assets/audio/recipe_steps/美式炒蛋/
+    - assets/audio/recipe_steps/番茄牛肉蛋花湯/
+    - assets/audio/recipe_steps/蒜香花椰菜/
+    - assets/audio/recipe_steps/草莓冰淇淋/
+    - assets/audio/recipe_steps/番茄炒蛋/
