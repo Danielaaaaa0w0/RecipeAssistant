@@ -50,6 +50,17 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.debug
         }
+        debug {
+            // This is the default debug signing config.
+            signingConfig = signingConfigs.debug
+        }
+        profile {
+            // This is the default profile signing config.
+            signingConfig = signingConfigs.debug
+        }
+        innerTest {
+            matchingFallbacks = ['debug', 'release']
+        }
     }
 }
 
@@ -60,3 +71,4 @@ flutter {
 dependencies {
     implementation project(':unityLibrary')
 }
+
