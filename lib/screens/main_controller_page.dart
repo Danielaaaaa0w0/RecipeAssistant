@@ -105,19 +105,7 @@ class _MainControllerPageState extends State<MainControllerPage> {
           ),
         );
     } else if (_currentPageIndex == 2) { // ARPage
-      appBar = AppBar(
-         // title: Text(_recipeForAR?.recipeName ?? _pageTitles[_currentPageIndex]), // 可以動態顯示菜名
-         title: Text(_pageTitles[_currentPageIndex]), // 或者保持固定標題
-         backgroundColor: Colors.transparent,
-         elevation: 0,
-         leading: IconButton( // 從 AR 頁返回推薦頁
-            icon: Icon(Icons.arrow_back, color: Theme.of(context).brightness == Brightness.light ? Colors.black54 : Colors.white70),
-            onPressed: () {
-              _pageController.animateToPage(1, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
-              WidgetsBinding.instance.addPostFrameCallback((_) { if(mounted) { setState(() { _currentPageIndex = 1; _isPageViewScrollable = false; }); }});
-            },
-          ),
-       );
+       appBar = null; // ARPage 通常不需要 AppBar，或可以自定義
     } else { // SettingsPage
        appBar = AppBar( title: Text(_pageTitles[_currentPageIndex]), automaticallyImplyLeading: false, );
     }

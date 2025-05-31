@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:logging/logging.dart';
 import 'package:video_player/video_player.dart'; // <--- 導入 video_player
 import '../utils/image_mappings.dart'; // 確保 chefAvatarPath 在這裡或直接定義
+import '../utils/keyword_mappings.dart'; // <--- 導入關鍵字映射
 
 final _log = Logger('InputPage');
 
@@ -46,16 +47,17 @@ class _InputPageState extends State<InputPage> {
   Timer? _replayTimer; // 用於影片播放完畢後的延遲（如果需要）
   // --------------------
 
+  // --- 使用 keyword_mappings.dart 中的標準列表 ---
+  final List<String> _categories = standardCategories;
+  final List<String> _moods = standardMoods; // ["低落", "疲憊", "放鬆", "快樂", "焦慮", "懷舊", "忙碌"]
+  // ---------------------------------------------
 
-  final List<String> _categories = ["家常菜", "甜點", "異國風情", "湯品", "健康輕食"];
-  final List<String> _moods = ["隨意", "低落", "刺激", "療癒", "健康"];
-
-  final String whisperBackendUrl = 'http://140.116.115.198:8000/recognize';
+  final String whisperBackendUrl = 'http://172.20.10.5:8000/recognize';
 
   @override
   void initState() {
     super.initState();
-    _initializeStage(); // 初始化第一個階段
+    _initializeStage(_currentStage);
   }
 
   @override
@@ -67,31 +69,34 @@ class _InputPageState extends State<InputPage> {
   }
 
   // --- 初始化或切換階段的邏輯 ---
-  void _initializeStage() {
+  void _initializeStage(InputStage stage) {
+    _log.info("Initializing stage: $stage");
     _textController.clear();
     String newDialogue;
     String? newVideoPath;
 
+    _currentStage = stage;
+
     switch (_currentStage) {
       case InputStage.askingMood:
-        final moodOptionsForSpeech = _moods.join('、');
-        newDialogue = "你現在的心情如何呢？\n你可以說：$moodOptionsForSpeech，或按「下一步」跳過";
+        // 讓 Avatar 說出可選項
+        newDialogue = "你現在的心情如何呢？";
         newVideoPath = 'assets/videos/asking_mood_avatar.mp4';
         break;
       case InputStage.askingQuery:
-        newDialogue = "想做什麼料理呢？\n(可以直接說菜名，或按「下一步」跳過)";
+        newDialogue = "想做什麼料理呢？";
         newVideoPath = 'assets/videos/asking_query_avatar.mp4';
         break;
       case InputStage.askingCategory:
-        newDialogue = "有特別偏好哪些類別的料理嗎？\n你可以說：${_categories.join('、')}，或按「下一步」跳過";
+        // 讓 Avatar 說出可選項
+        newDialogue = "有特別偏好哪些類別的料理嗎？";
         newVideoPath = 'assets/videos/asking_category_avatar.mp4';
         break;
       case InputStage.completed:
         newDialogue = "好的，我來幫你找找！";
         newVideoPath = null;
-        if (_videoController?.value.isPlaying ?? false) {
-            _videoController?.pause();
-        }
+        _videoController?.pause();
+        _log.info("Input completed, submitting...");
         _submit();
         break;
     }
@@ -106,8 +111,10 @@ class _InputPageState extends State<InputPage> {
       _playAvatarVideo(newVideoPath);
       _currentVideoPath = newVideoPath;
     } else if (newVideoPath == null && _videoController != null) {
-      // 如果沒有新影片路徑，並且當前有影片控制器
-      // _videoController?.pause(); // 如果想停在最後一幀
+      _videoController?.dispose().then((_) {
+         if (mounted) setState(() => _videoController = null);
+      });
+      _currentVideoPath = null;
     }
   }
   
@@ -188,51 +195,64 @@ class _InputPageState extends State<InputPage> {
     }
   }
   // -------------------------------
-  // --- 處理「下一步/完成」按鈕 ---
+
+  // --- 修改：處理「下一步/完成」按鈕，加入關鍵字提取 ---
   void _handleNextOrComplete() {
     FocusScope.of(context).unfocus();
     String currentInput = _textController.text.trim();
     _log.info("Next/Complete pressed. Stage: $_currentStage, Input: '$currentInput', Category: $_selectedCategory, Mood: $_selectedMood, Query: $_currentQueryText");
 
-    setState(() {
-      switch (_currentStage) {
-        case InputStage.askingMood:
-          if (currentInput.isNotEmpty) {
-            final matchedMood = _moods.firstWhere(
-                (m) => m.toLowerCase() == currentInput.toLowerCase(), // 直接比較
-                orElse: () => "");
-            if (matchedMood.isNotEmpty) _selectedMood = matchedMood;
-          } else {
-            _selectedMood ??= null;
+    // 不論 setState 在哪，_initializeStage 最終會呼叫它
+    switch (_currentStage) {
+      case InputStage.askingMood:
+        if (currentInput.isNotEmpty) {
+          // 使用輔助函數提取關鍵字
+          String? extractedMood = extractKeyword(currentInput, moodKeywords, _moods);
+          if (extractedMood != null) {
+            _selectedMood = extractedMood;
+            _log.info("心情階段：透過文字輸入 '$currentInput' 匹配到標準心情: '$_selectedMood'");
+          } else if (_selectedMood == null) { // 如果文字輸入不匹配，且Chip也沒選
+            _selectedMood = null; // 視為跳過
+             _log.info("心情階段：文字輸入 '$currentInput' 未匹配，且未點選 Chip，跳過。");
           }
-          _log.info("階段1 (心情) 確認: $_selectedMood (文字輸入: '$currentInput')");
-          _currentStage = InputStage.askingQuery; // 進入下一階段
-          break;
-        case InputStage.askingQuery:
-          _currentQueryText = currentInput; // 可以為空，代表跳過
-          _log.info("階段2 (菜名/關鍵字) 確認: '$_currentQueryText'");
-          _currentStage = InputStage.askingCategory;
-          break;
-        case InputStage.askingCategory:
-          if (currentInput.isNotEmpty) {
-            final matchedCategory = _categories.firstWhere(
-                (cat) => cat.toLowerCase() == currentInput.toLowerCase(),
-                orElse: () => "");
-            if (matchedCategory.isNotEmpty) _selectedCategory = matchedCategory;
-          } else {
-            _selectedCategory ??= null;
+        } else if (_selectedMood == null) { // 文字框為空，也沒點Chip
+          _selectedMood = null; // 跳過
+          _log.info("心情階段：輸入為空，且未點選 Chip，跳過。");
+        }
+        // _selectedMood 可能已透過 Chip 點擊設定
+        _log.info("階段1 (心情) 確認: $_selectedMood");
+        _currentStage = InputStage.askingQuery;
+        break;
+
+      case InputStage.askingQuery:
+        _currentQueryText = currentInput; // 菜名/關鍵字直接使用用戶輸入，或留空
+        _log.info("階段2 (菜名/關鍵字) 確認: '$_currentQueryText'");
+        _currentStage = InputStage.askingCategory;
+        break;
+
+      case InputStage.askingCategory:
+        if (currentInput.isNotEmpty) {
+          String? extractedCategory = extractKeyword(currentInput, categoryKeywords, _categories);
+          if (extractedCategory != null) {
+            _selectedCategory = extractedCategory;
+            _log.info("分類階段：透過文字輸入 '$currentInput' 匹配到標準分類: '$_selectedCategory'");
+          } else if (_selectedCategory == null) {
+            _selectedCategory = null; // 視為跳過
+            _log.info("分類階段：文字輸入 '$currentInput' 未匹配，且未點選 Chip，跳過。");
           }
-          _log.info("階段3 (分類) 確認: $_selectedCategory (文字輸入: '$currentInput')");
-          _currentStage = InputStage.completed;
-          break;
-        case InputStage.completed:
-          // 已經是完成階段，理論上按鈕文字是「完成搜尋」，再次點擊也是提交
-          break;
-      }
-      _initializeStage(); // 更新對話、影片，並在 completed 時觸發 _submit
-    });
+        } else if (_selectedCategory == null) {
+          _selectedCategory = null; // 跳過
+          _log.info("分類階段：輸入為空，且未點選 Chip，跳過。");
+        }
+        _log.info("階段3 (分類) 確認: $_selectedCategory");
+        _currentStage = InputStage.completed;
+        break;
+      case InputStage.completed:
+        break;
+    }
+    _initializeStage(_currentStage);
   }
-  // -----------------------------
+  // ---------------------------------------------------
 
   void _submit() {
     _log.info("最終提交：心情='$_selectedMood', 菜名='$_currentQueryText', 分類='$_selectedCategory'");
@@ -321,7 +341,7 @@ class _InputPageState extends State<InputPage> {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 0, bottom: 8.0, top: 15.0),
-          child: Text('請選擇或說出您的心情：', style: TextStyle(fontSize: 16, color: Colors.grey[700]))
+          child: Text('請選擇或說出您的心情(或是按下一步)：', style: TextStyle(fontSize: 16, color: Colors.grey[700]))
         ),
         Wrap(
           spacing: 8.0, runSpacing: 4.0,
@@ -349,7 +369,7 @@ class _InputPageState extends State<InputPage> {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 0, bottom: 8.0, top: 15.0),
-          child: Text('請選擇或說出一個分類：', style: TextStyle(fontSize: 16, color: Colors.grey[700]))
+          child: Text('請選擇或說出一個分類(或是按完成)：', style: TextStyle(fontSize: 16, color: Colors.grey[700]))
         ),
         Wrap(
           spacing: 8.0, runSpacing: 4.0,

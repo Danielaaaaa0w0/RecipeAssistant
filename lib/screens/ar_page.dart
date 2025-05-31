@@ -40,13 +40,13 @@ class _ARPageState extends State<ARPage> with AutomaticKeepAliveClientMixin<ARPa
 
   Timer? _dialogueHideTimer; // 用於手動管理對話泡泡的隱藏計時器
 
-  // --- 新增 AudioPlayer 實例 ---
   final AudioPlayer _audioPlayer = AudioPlayer();
-  PlayerState? _playerState; // 用於追蹤播放器狀態
+  PlayerState? _playerState;
   StreamSubscription? _playerStateSubscription;
-  StreamSubscription? _playerCompletionSubscription; // 用於監聽播放完成
-  StreamSubscription? _playerErrorSubscription; // 用於監聽播放器錯誤
-  // ---------------------------
+  StreamSubscription? _playerCompletionSubscription;
+
+  // GlobalKey 用於打開 Drawer
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -354,103 +354,154 @@ void _repeatStep() {
     const double avatarPadding = 15.0;
     const double dialoguePaddingRight = avatarPadding + avatarSize + 10.0;
 
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: UnityWidget(
-               onUnityCreated: _onUnityCreated,
-               onUnityMessage: _onUnityMessage,
-               useAndroidViewSurface: true, // 保持您範例中的設定
-               fullscreen: false, // 必須為 false 以便疊加 Flutter UI
-               enablePlaceholder: false, // <--- 根據您的要求，移除 placeholder
-               // placeholder: Container(...), // 已移除
-               printSetupLog: true, // 建議在除錯階段開啟
-            ),
-          ),
+        // 獲取語言服務實例，用於 Drawer 中的 Switch
+    final langService = Provider.of<LanguagePreferenceService>(context);
 
-          // 根據狀態顯示「開始播放」按鈕或「步驟控制」按鈕
-          if (!_initialStepTriggeredByUser && _steps.isNotEmpty)
-            Positioned(
-              bottom: mediaQueryPadding.bottom + 20,
-              left: 20,
-              right: 20,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.play_circle_fill_rounded),
-                label: const Text("開始播放步驟"),
-                onPressed: _handleStartPlayback, // <--- 呼叫新的處理函數
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
-                ),
+
+    return Scaffold( // <--- ARPage 現在有自己的 Scaffold 來放置 Drawer
+      key: _scaffoldKey, // <--- 用於打開 Drawer
+      // AppBar 可以是透明的，只為了放置漢堡選單按鈕
+      appBar: AppBar(
+        title: Text(widget.selectedRecipe?.recipeName ?? "AR 食譜", style: TextStyle(color: Theme.of(context).brightness == Brightness.light ? Colors.black54: Colors.white70)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: IconThemeData(color: Theme.of(context).brightness == Brightness.light ? Colors.black54: Colors.white70), // 確保漢堡圖示可見
+        // leading 由 Drawer 自動處理 (如果 AppBar 不是 null)
+        // 如果 MainControllerPage 已經有 AppBar，這裡的 AppBar 行為可能需要調整
+        // 或者直接在 Stack 中 Positioned 一個 IconButton 來打開 Drawer
+      ),
+      drawer: Drawer( // <--- 新增漢堡選單 (Drawer)
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: <Widget>[
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
               ),
-            )
-          else if (_initialStepTriggeredByUser && _steps.isNotEmpty) // 如果已開始播放且有步驟
-            Positioned(
-              bottom: mediaQueryPadding.bottom + 20, left: 0, right: 0,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildControlButton(icon: Icons.arrow_back_ios, label: '上一步', onPressed: _goToPreviousStep),
-                    _buildControlButton(icon: Icons.replay_outlined, label: '重播一次', onPressed: _repeatStep),
-                    _buildControlButton(icon: Icons.arrow_forward_ios, label: '下一步', onPressed: _goToNextStep),
-                  ],
+              child: const Text(
+                'AR 設定',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
                 ),
               ),
             ),
-
-          /* // 測試用手動輸入框已註解掉
-          Positioned(
-            bottom: mediaQueryPadding.bottom + 80,
-            left: 15,
-            right: 15,
-            child: Material(
-              // ...
+            SwitchListTile(
+              title: const Text('語音語言'),
+              subtitle: Text(langService.currentLanguage == PreferredLanguage.mandarin ? '目前: 國語' : '目前: 台語'),
+              value: langService.currentLanguage == PreferredLanguage.taiwanese,
+              onChanged: (bool value) {
+                PreferredLanguage newLanguage = value ? PreferredLanguage.taiwanese : PreferredLanguage.mandarin;
+                langService.setLanguage(newLanguage);
+                // 切換語言後，如果正在播放步驟，可以考慮重新觸發當前步驟的語音和對話
+                if(_initialStepTriggeredByUser && _steps.isNotEmpty) {
+                    _updateAvatarDialogueAndSendToUnity(_currentStepIndex, sendToUnity: false); // 只更新對話和語音，不重複發送Unity指令
+                }
+              },
+              secondary: Icon(langService.currentLanguage == PreferredLanguage.mandarin ? Icons.speaker_notes : Icons.chat_bubble_outline_rounded),
+              activeColor: Theme.of(context).colorScheme.primary,
             ),
-          ),
-          */
+            // 您可以在此處加入更多 Drawer 選項
+          ],
+        ),
+      ),
+      body: GestureDetector( // Stack 現在是 body 的一部分
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: UnityWidget(
+                onUnityCreated: _onUnityCreated,
+                onUnityMessage: _onUnityMessage,
+                useAndroidViewSurface: true, // 保持您範例中的設定
+                fullscreen: false, // 必須為 false 以便疊加 Flutter UI
+                enablePlaceholder: false, // <--- 根據您的要求，移除 placeholder
+                // placeholder: Container(...), // 已移除
+                printSetupLog: true, // 建議在除錯階段開啟
+              ),
+            ),
+            // 根據狀態顯示「開始播放」按鈕或「步驟控制」按鈕
+            if (!_initialStepTriggeredByUser && _steps.isNotEmpty)
+              Positioned(
+                bottom: mediaQueryPadding.bottom + 20,
+                left: 20,
+                right: 20,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.play_circle_fill_rounded),
+                  label: const Text("開始播放步驟"),
+                  onPressed: _handleStartPlayback, // <--- 呼叫新的處理函數
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
+                  ),
+                ),
+              )
+            else if (_initialStepTriggeredByUser && _steps.isNotEmpty) // 如果已開始播放且有步驟
+              Positioned(
+                bottom: mediaQueryPadding.bottom + 20, left: 0, right: 0,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildControlButton(icon: Icons.arrow_back_ios, label: '上一步', onPressed: _goToPreviousStep),
+                      _buildControlButton(icon: Icons.replay_outlined, label: '重播一次', onPressed: _repeatStep),
+                      _buildControlButton(icon: Icons.arrow_forward_ios, label: '下一步', onPressed: _goToNextStep),
+                    ],
+                  ),
+                ),
+              ),
 
-          // Avatar
-          Positioned(
-             top: mediaQueryPadding.top + appBarHeight + 10, right: avatarPadding,
-             child: ClipRRect(
-               borderRadius: BorderRadius.circular(12.0),
-               child: Container(
-                 width: avatarSize, height: avatarSize, color: Colors.deepOrange[100],
-                 child: Image.asset(
-                   chefAvatarPath, // 使用 utils/image_mappings.dart 中的路徑
-                   fit: BoxFit.cover,
-                   errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.person_outline, color: Colors.white, size: 40))
-                 ),
-               ),
-             ),
-          ),
-          // 對話泡泡
-          Positioned(
-             top: mediaQueryPadding.top + appBarHeight + 20, left: 15, right: dialoguePaddingRight,
-             child: AnimatedOpacity(
-               opacity: _showDialogue ? 1.0 : 0.0,
-               duration: const Duration(milliseconds: 300),
-               child: Material(
-                 elevation: 4,
-                 borderRadius: BorderRadius.circular(15.0),
-                 color: Colors.white,
-                 child: Padding(
-                   padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                   child: Text(
-                     _dialogueText,
-                     style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.4),
-                   ),
-                 ),
-               ),
-             ),
-          ),
-        ],
+            /* // 測試用手動輸入框已註解掉
+            Positioned(
+              bottom: mediaQueryPadding.bottom + 80,
+              left: 15,
+              right: 15,
+              child: Material(
+                // ...
+              ),
+            ),
+            */
+
+            // Avatar
+            Positioned(
+              top: mediaQueryPadding.top + appBarHeight + 10, right: avatarPadding,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12.0),
+                child: Container(
+                  width: avatarSize, height: avatarSize, color: Colors.deepOrange[100],
+                  child: Image.asset(
+                    chefAvatarPath, // 使用 utils/image_mappings.dart 中的路徑
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Center(child: Icon(Icons.person_outline, color: Colors.white, size: 40))
+                  ),
+                ),
+              ),
+            ),
+            // 對話泡泡
+            Positioned(
+              top: mediaQueryPadding.top + appBarHeight + 20, left: 15, right: dialoguePaddingRight,
+              child: AnimatedOpacity(
+                opacity: _showDialogue ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(15.0),
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                    child: Text(
+                      _dialogueText,
+                      style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

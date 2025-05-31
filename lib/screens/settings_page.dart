@@ -1,19 +1,14 @@
 // lib/screens/settings_page.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/language_preference_service.dart'; // 導入服務
+import '../services/language_preference_service.dart';
 import 'package:logging/logging.dart';
 
 final _log = Logger('SettingsPage');
 
-class SettingsPage extends StatefulWidget {
+class SettingsPage extends StatelessWidget { // 可以是 StatelessWidget 因為狀態由 Provider 管理
   const SettingsPage({super.key});
 
-  @override
-  State<SettingsPage> createState() => _SettingsPageState();
-}
-
-class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     // 使用 Consumer 來獲取 LanguagePreferenceService 並在其變化時重建相關部分
@@ -21,47 +16,47 @@ class _SettingsPageState extends State<SettingsPage> {
       builder: (context, langService, child) {
         _log.info("SettingsPage rebuilding. Current language: ${langService.currentLanguage}");
         return Scaffold(
-          // AppBar 由 MainControllerPage 控制，這裡可以不用
-          // appBar: AppBar(title: const Text('設定')),
+          // AppBar 通常由 MainControllerPage 控制，這裡可以不用，除非您希望它有獨立的 AppBar
           body: ListView(
             padding: const EdgeInsets.all(16.0),
             children: <Widget>[
-              Text(
-                '語音偏好設定',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(
+                  '語音播放設定',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
               ),
-              const SizedBox(height: 8),
-              RadioListTile<PreferredLanguage>(
-                title: const Text('國語 (Mandarin)'),
-                value: PreferredLanguage.mandarin,
-                groupValue: langService.currentLanguage,
-                onChanged: (PreferredLanguage? value) {
-                  if (value != null) {
-                    _log.info("Setting language to Mandarin");
-                    langService.setLanguage(value);
-                  }
+              SwitchListTile(
+                title: const Text('語音語言', style: TextStyle(fontSize: 17)),
+                subtitle: Text(
+                  langService.currentLanguage == PreferredLanguage.mandarin
+                      ? '目前選擇：國語'
+                      : '目前選擇：台語',
+                  style: TextStyle(fontSize: 15, color: Colors.grey[600]),
+                ),
+                value: langService.currentLanguage == PreferredLanguage.taiwanese, // true 代表台語, false 代表國語
+                onChanged: (bool value) {
+                  PreferredLanguage newLanguage =
+                      value ? PreferredLanguage.taiwanese : PreferredLanguage.mandarin;
+                  _log.info("Language switch toggled. New preference: $newLanguage");
+                  langService.setLanguage(newLanguage);
                 },
                 activeColor: Theme.of(context).colorScheme.primary,
-              ),
-              RadioListTile<PreferredLanguage>(
-                title: const Text('台語 (Taiwanese)'),
-                value: PreferredLanguage.taiwanese,
-                groupValue: langService.currentLanguage,
-                onChanged: (PreferredLanguage? value) {
-                  if (value != null) {
-                     _log.info("Setting language to Taiwanese");
-                    langService.setLanguage(value);
-                  }
-                },
-                activeColor: Theme.of(context).colorScheme.primary,
+                secondary: Icon(
+                  langService.currentLanguage == PreferredLanguage.mandarin
+                      ? Icons.speaker_notes // 國語圖示 (範例)
+                      : Icons.chat_bubble_outline_rounded, // 台語圖示 (範例)
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
               const Divider(height: 30, thickness: 1),
-              // 您可以在這裡加入其他的設定項...
               ListTile(
                 leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.secondary),
-                title: const Text('關於 App'),
+                title: const Text('關於 App', style: TextStyle(fontSize: 17)),
                 onTap: () {
                   showDialog(
                     context: context,
@@ -78,6 +73,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   );
                 },
               ),
+              // 您可以在這裡加入其他的設定項...
             ],
           ),
         );
