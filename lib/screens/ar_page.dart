@@ -9,7 +9,7 @@ import '../models/recipe_details.dart'; // 導入模型
 import '../models/recipe_step.dart';   // 導入模型
 import '../utils/image_mappings.dart'; // 導入 chefAvatarPath
 import '../services/language_preference_service.dart'; // <--- 導入語言服務
-
+import '../utils/haptic_feedback_utils.dart'; // <--- 導入
 
 // 為此頁面創建 Logger 實例
 final _log = Logger('ARPage');
@@ -282,6 +282,7 @@ class _ARPageState extends State<ARPage> with AutomaticKeepAliveClientMixin<ARPa
 
   // 「開始播放」按鈕的處理邏輯
   void _handleStartPlayback() {
+    AppHaptics.mediumImpact(); // <--- 重要操作
     if (_unityWidgetController == null) {
       _showSnackBar("AR 場景尚未完全連接，請稍候。");
       return;
@@ -304,6 +305,7 @@ class _ARPageState extends State<ARPage> with AutomaticKeepAliveClientMixin<ARPa
 
   // --- 控制按鈕邏輯 ---
   void _goToNextStep() {
+    AppHaptics.lightClick(); // <---
     if (!_initialStepTriggeredByUser) { _showSnackBar("請先點擊「開始播放」"); return; }
     if (_currentStepIndex < _steps.length - 1) {
       setState(() { _currentStepIndex++; });
@@ -315,6 +317,7 @@ class _ARPageState extends State<ARPage> with AutomaticKeepAliveClientMixin<ARPa
   }
 
   void _goToPreviousStep() {
+    AppHaptics.lightClick(); // <---
     if (!_initialStepTriggeredByUser) { _showSnackBar("請先點擊「開始播放」"); return; }
     if (_currentStepIndex > 0) {
       setState(() { _currentStepIndex--; });
@@ -326,6 +329,7 @@ class _ARPageState extends State<ARPage> with AutomaticKeepAliveClientMixin<ARPa
   }
 
 void _repeatStep() {
+    AppHaptics.lightClick(); // <---
     if (!_initialStepTriggeredByUser) { _showSnackBar("請先點擊「開始播放」"); return; }
     if (_steps.isNotEmpty && _currentStepIndex < _steps.length) {
       _log.info("Repeating step: ${_steps[_currentStepIndex].stepOrder}");

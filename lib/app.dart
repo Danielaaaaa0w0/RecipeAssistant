@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/main_controller_page.dart'; // 導入主控制器頁面
+import 'screens/welcome_page.dart';     // <--- 導入 WelcomePage
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -7,11 +8,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '食譜 AR 助手',
+      title: '心意廚房',
       theme: ThemeData(
         // --- 您的主題設定 ---
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.orangeAccent, // 換個溫暖的色調
+          seedColor: Colors.deepOrange, // 換個溫暖的色調
           brightness: Brightness.light,
         ),
         useMaterial3: true,
@@ -52,7 +53,9 @@ class MyApp extends StatelessWidget {
         ),
         // --- 主題設定結束 ---
       ),
-      home: const MainControllerPage(), // 將 MainControllerPage 設為首頁
+      // --- 修改 home 屬性 ---
+      home: const WelcomePage(), // <--- 將 WelcomePage 設為初始頁面
+      // ---------------------
       debugShowCheckedModeBanner: false,
     );
   }

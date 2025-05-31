@@ -12,6 +12,7 @@ import 'package:logging/logging.dart';
 import 'package:video_player/video_player.dart'; // <--- 導入 video_player
 import '../utils/image_mappings.dart'; // 確保 chefAvatarPath 在這裡或直接定義
 import '../utils/keyword_mappings.dart'; // <--- 導入關鍵字映射
+import '../utils/haptic_feedback_utils.dart'; // <--- 導入
 
 final _log = Logger('InputPage');
 
@@ -214,6 +215,7 @@ class _InputPageState extends State<InputPage> {
 
   // --- 修改：處理「下一步/完成」按鈕，加入關鍵字提取 ---
   void _handleNextOrComplete() {
+    AppHaptics.mediumImpact(); // <--- 加入中等強度的回饋
     FocusScope.of(context).unfocus();
     String currentInputFromTextField = _textController.text.trim();
     _log.info("Next/Complete pressed. Stage: $_currentStage, TextField Input: '$currentInputFromTextField', Query: '$_currentQueryText', Category: $_selectedCategory, Mood: $_selectedMood");
@@ -281,6 +283,7 @@ class _InputPageState extends State<InputPage> {
 
   // --- 錄音、權限、網路請求相關函數 (保持不變) ---
   void _toggleRecording() async {
+    AppHaptics.lightClick(); // <--- 加入輕點擊回饋
     if (_isListening) {
       await _stopRecordingAndSend();
     } else {
@@ -371,6 +374,7 @@ class _InputPageState extends State<InputPage> {
               label: Text(mood),
               selected: isSelected,
               onSelected: (selected) {
+                AppHaptics.lightClick(); // <--- 加入輕點擊回饋
                 setState(() {
                   _selectedMood = selected ? mood : null;
                   _textController.text = selected ? mood : ""; // <--- 點選 Chip 時更新 TextField
@@ -406,6 +410,7 @@ class _InputPageState extends State<InputPage> {
               label: Text(category),
               selected: isSelected,
               onSelected: (selected) {
+                AppHaptics.lightClick(); // <--- 加入輕點擊回饋
                 setState(() {
                   _selectedCategory = selected ? category : null;
                   _textController.text = selected ? category : ""; // <--- 點選 Chip 時更新 TextField
@@ -442,6 +447,7 @@ class _InputPageState extends State<InputPage> {
               label: Text(recipeName),
               selected: isSelected,
               onSelected: (selected) {
+                AppHaptics.lightClick(); // <--- 加入輕點擊回饋
                 setState(() {
                   if (selected) {
                     _textController.text = recipeName;

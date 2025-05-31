@@ -9,6 +9,7 @@ import '../utils/image_mappings.dart'; // <--- 導入 image_mappings.dart
 import 'package:logging/logging.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart'; // <--- 導入頁面指示器
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart'; // <--- 導入交錯動畫套件
+import '../utils/haptic_feedback_utils.dart'; // <--- 導入
 
 final _log = Logger('RecommendationPage');
 
@@ -89,6 +90,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Future<void> _handleRecipeTap(RecipeListItem recipeListItem) async {
+    AppHaptics.lightClick(); // <--- 加入輕點擊回饋
     // ... (此函數的 API 呼叫和 JSON 解析邏輯保持不變) ...
     if (!mounted || _isFetchingDetails) return;
     setState(() => _isFetchingDetails = true);
@@ -189,7 +191,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
           actionsPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           actions: <Widget>[
             TextButton(
-              onPressed: _isFetchingDetails ? null : () => Navigator.of(context).pop(),
+              onPressed: _isFetchingDetails ? null : () {
+                AppHaptics.lightClick(); // <---
+                Navigator.of(context).pop();
+              },
               child: const Text('關閉', style: TextStyle(fontSize: 16)),
             ),
             ElevatedButton(
@@ -199,6 +204,7 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12) // 調整按鈕 padding
               ),
               onPressed: (_isFetchingDetails || details.steps.isEmpty) ? null : () {
+                AppHaptics.mediumImpact(); // <--- 重要操作用中等強度
                 Navigator.of(context).pop();
                 widget.onRecipeSelectedForAR(details);
               },
