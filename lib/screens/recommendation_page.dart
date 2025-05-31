@@ -8,6 +8,7 @@ import '../models/recipe_details.dart';
 import '../utils/image_mappings.dart'; // <--- 導入 image_mappings.dart
 import 'package:logging/logging.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart'; // <--- 導入頁面指示器
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart'; // <--- 導入交錯動畫套件
 
 final _log = Logger('RecommendationPage');
 
@@ -188,13 +189,10 @@ class _RecommendationPageState extends State<RecommendationPage> {
           actionsPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           actions: <Widget>[
             TextButton(
-              child: const Text('關閉', style: TextStyle(fontSize: 16)), // 按鈕字體稍大
               onPressed: _isFetchingDetails ? null : () => Navigator.of(context).pop(),
+              child: const Text('關閉', style: TextStyle(fontSize: 16)),
             ),
             ElevatedButton(
-              child: _isFetchingDetails
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
-                  : const Text('開始 AR 步驟！', style: TextStyle(fontSize: 16)), // 按鈕字體稍大
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
@@ -204,6 +202,9 @@ class _RecommendationPageState extends State<RecommendationPage> {
                 Navigator.of(context).pop();
                 widget.onRecipeSelectedForAR(details);
               },
+              child: _isFetchingDetails
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                  : const Text('開始 AR 步驟！', style: TextStyle(fontSize: 16)),
             ),
           ],
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
@@ -251,133 +252,132 @@ class _RecommendationPageState extends State<RecommendationPage> {
           ? const Center(child: CircularProgressIndicator())
           : _recommendedRecipes.isEmpty
               ? Center( child: Text( "抱歉，找不到符合條件的食譜。\n請試試其他關鍵字或分類。", textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey[600]), ), )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0), // 調整列表整體邊距
-                  itemCount: _recommendedRecipes.length,
-                  itemBuilder: (context, index) {
-                    final recipeItem = _recommendedRecipes[index];
-                    final String imagePath = getRecipeImagePath(recipeItem.recipeName);
+              
+              : AnimationLimiter( // <--- 加入 AnimationLimiter 包裹 ListView
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 16.0),
+                    itemCount: _recommendedRecipes.length,
+                    itemBuilder: (context, index) {
+                      final recipeItem = _recommendedRecipes[index];
+                      final String imagePath = getRecipeImagePath(recipeItem.recipeName);
 
-                    return Card(
-                      elevation: 3.0, // 稍微增加陰影
-                      margin: const EdgeInsets.only(bottom: 16.0), // 增加卡片間的垂直間距
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)), // 圓角稍大
-                      clipBehavior: Clip.antiAlias, // 確保圖片也應用圓角
-                      child: InkWell( // 讓整個 Card 可點擊並有水波紋效果
-                        onTap: _isFetchingDetails ? null : () => _handleRecipeTap(recipeItem),
-                        child: Padding( // 給卡片內容增加一些 padding
-                          padding: const EdgeInsets.all(12.0),
-                          child: Row( // 使用 Row 來橫向排列圖片和文字資訊
-                            crossAxisAlignment: CrossAxisAlignment.start, // 頂部對齊
-                            children: [
-                              // 左側圖片
-                              SizedBox(
-                                width: 100, // 圖片寬度加大
-                                height: 100, // 圖片高度加大
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8.0),
-                                  child: Image.asset(
-                                    imagePath,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      _log.warning("無法載入本地圖片: $imagePath", error, stackTrace);
-                                      return Container(color: Colors.grey[200], child: Icon(Icons.restaurant_menu, color: Colors.grey[400], size: 40,));
-                                    },
+                      // --- 用 AnimationConfiguration 包裹每個列表項 ---
+                      return AnimationConfiguration.staggeredList(
+                        position: index, // 列表項的索引
+                        duration: const Duration(milliseconds: 375), // 動畫時長
+                        child: SlideAnimation( // 可以選擇滑動動畫
+                          verticalOffset: 50.0, // 垂直滑動的偏移量
+                          child: FadeInAnimation( // 也可以疊加淡入動畫
+                            child: Card( // 您原本的 Card Widget
+                              elevation: 3.0,
+                              margin: const EdgeInsets.only(bottom: 16.0),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: _isFetchingDetails ? null : () => _handleRecipeTap(recipeItem),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // 左側圖片 (不變)
+                                      SizedBox(
+                                        width: 100, height: 100,
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8.0),
+                                          child: Image.asset(
+                                            imagePath,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              _log.warning("無法載入本地圖片: $imagePath", error, stackTrace);
+                                              return Container(color: Colors.grey[200], child: Icon(Icons.restaurant_menu, color: Colors.grey[400], size: 40,));
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12.0),
+                                      // 右側文字資訊 (使用 Expanded 填滿剩餘空間)
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              recipeItem.recipeName, // 保持食譜名稱
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 17, // 食譜名稱字體稍大
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 6.0), // 名稱和描述/難度之間的間距
+
+                                            // --- 修改：將難度和分類放在一行或相鄰顯示 ---
+                                            Row( // 使用 Row 並排顯示難度和第一個分類 (如果有的話)
+                                              crossAxisAlignment: CrossAxisAlignment.center,
+                                              children: [
+                                                if (recipeItem.difficultyStars != null && recipeItem.difficultyStars!.isNotEmpty)
+                                                  Text(
+                                                    "難度: ${recipeItem.difficultyStars!}",
+                                                    style: TextStyle(fontSize: 14, color: Colors.orange[700]),
+                                                  ),
+                                                if (recipeItem.difficultyStars != null && recipeItem.difficultyStars!.isNotEmpty && recipeItem.categories.isNotEmpty)
+                                                  const Padding(
+                                                    padding: EdgeInsets.symmetric(horizontal: 6.0),
+                                                    child: Text("·", style: TextStyle(fontSize: 14, color: Colors.grey)), // 分隔符號
+                                                  ),
+                                                if (recipeItem.categories.isNotEmpty)
+                                                  Flexible( // 使用 Flexible 避免文字過長溢出
+                                                    child: Text(
+                                                      // 如果有多個分類，只顯示第一個，或用 Chip 顯示全部
+                                                      // 這裡先簡單顯示第一個分類
+                                                      recipeItem.categories.first,
+                                                      style: TextStyle(fontSize: 14, color: Colors.grey[700], fontStyle: FontStyle.italic),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                            
+                                            // --- 結束修改 ---
+
+                                            // 顯示心情標籤
+                                            if (recipeItem.moods.isNotEmpty)
+                                              Wrap(
+                                                spacing: 6.0, // 標籤之間的水平間距
+                                                runSpacing: 4.0, // 標籤換行後的垂直間距
+                                                children: recipeItem.moods.map((mood) {
+                                                  return Chip(
+                                                    label: Text(mood, style: const TextStyle(fontSize: 12)), // 心情標籤字體可以小一點
+                                                    backgroundColor: Colors.blue[50], // 給心情標籤一個背景色
+                                                    labelPadding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 0), // 調整 Chip 內邊距
+                                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // 減小點擊區域
+                                                    visualDensity: VisualDensity.compact, // 更緊湊的視覺
+                                                  );
+                                                }).toList(),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      // 右側的載入指示器或箭頭 (保持不變)
+                                      if (_isFetchingDetails && mounted) // 確保 mounted
+                                        const Padding(
+                                          padding: EdgeInsets.only(left: 8.0),
+                                          child: SizedBox(width:24, height:24, child: CircularProgressIndicator(strokeWidth: 2))
+                                        )
+                                      else
+                                        const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
+                                    ],
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 12.0), // 圖片和文字之間的間距
-
-                              // 右側文字資訊 (使用 Expanded 填滿剩餘空間)
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      recipeItem.recipeName, // 保持食譜名稱
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 17, // 食譜名稱字體稍大
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 6.0), // 名稱和描述/難度之間的間距
-
-                                    // --- 修改：將難度和分類放在一行或相鄰顯示 ---
-                                    Row( // 使用 Row 並排顯示難度和第一個分類 (如果有的話)
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        if (recipeItem.difficultyStars != null && recipeItem.difficultyStars!.isNotEmpty)
-                                          Text(
-                                            "難度: ${recipeItem.difficultyStars!}",
-                                            style: TextStyle(fontSize: 14, color: Colors.orange[700]),
-                                          ),
-                                        if (recipeItem.difficultyStars != null && recipeItem.difficultyStars!.isNotEmpty && recipeItem.categories.isNotEmpty)
-                                          const Padding(
-                                            padding: EdgeInsets.symmetric(horizontal: 6.0),
-                                            child: Text("·", style: TextStyle(fontSize: 14, color: Colors.grey)), // 分隔符號
-                                          ),
-                                        if (recipeItem.categories.isNotEmpty)
-                                          Flexible( // 使用 Flexible 避免文字過長溢出
-                                            child: Text(
-                                              // 如果有多個分類，只顯示第一個，或用 Chip 顯示全部
-                                              // 這裡先簡單顯示第一個分類
-                                              recipeItem.categories.first,
-                                              style: TextStyle(fontSize: 14, color: Colors.grey[700], fontStyle: FontStyle.italic),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    
-                                    // --- 結束修改 ---
-
-                                    // 顯示心情標籤
-                                    if (recipeItem.moods.isNotEmpty)
-                                      Wrap(
-                                        spacing: 6.0, // 標籤之間的水平間距
-                                        runSpacing: 4.0, // 標籤換行後的垂直間距
-                                        children: recipeItem.moods.map((mood) {
-                                          return Chip(
-                                            label: Text(mood, style: const TextStyle(fontSize: 12)), // 心情標籤字體可以小一點
-                                            backgroundColor: Colors.blue[50], // 給心情標籤一個背景色
-                                            labelPadding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 0), // 調整 Chip 內邊距
-                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // 減小點擊區域
-                                            visualDensity: VisualDensity.compact, // 更緊湊的視覺
-                                          );
-                                        }).toList(),
-                                      ),
-                                    
-                                    // 原本的 recommendationDescription 可以選擇性保留或移除
-                                    // if (recipeItem.recommendationDescription != null && recipeItem.recommendationDescription!.isNotEmpty && recipeItem.moods.isEmpty)
-                                    //   Padding(
-                                    //     padding: const EdgeInsets.only(top: 4.0),
-                                    //     child: Text(
-                                    //       recipeItem.recommendationDescription!,
-                                    //       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                                    //       maxLines: 2,
-                                    //       overflow: TextOverflow.ellipsis,
-                                    //     ),
-                                    //   ),
-
-                                  ],
-                                ),
-                              ),
-                              // 右側的載入指示器或箭頭 (保持不變)
-                              if (_isFetchingDetails && mounted) // 確保 mounted
-                                const Padding(
-                                  padding: EdgeInsets.only(left: 8.0),
-                                  child: SizedBox(width:24, height:24, child: CircularProgressIndicator(strokeWidth: 2))
-                                )
-                              else
-                                const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.grey),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                      // --- 動畫包裹結束 ---
+                    },
+                  ),
                 ),
     );
   }

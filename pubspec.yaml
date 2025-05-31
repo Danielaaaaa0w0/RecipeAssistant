@@ -41,6 +41,8 @@ dependencies:
   audioplayers: ^5.2.1 # <--- 修改為嘗試的舊版本
   provider: ^6.1.2 # 用於狀態管理
   shared_preferences: ^2.2.3 # 用於持久化儲存
+  flutter_staggered_animations: ^1.1.1
+
   
 
 dev_dependencies:
