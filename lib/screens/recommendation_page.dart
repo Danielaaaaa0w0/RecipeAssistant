@@ -1,8 +1,10 @@
 // lib/screens/recommendation_page.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'dart:async';
+import 'dart:convert';
+import 'package:provider/provider.dart'; // <--- 導入 Provider
+import '../services/backend_url_service.dart'; // <--- 導入後端 URL 服務
 import '../models/recipe_list_item.dart';
 import '../models/recipe_details.dart';
 import '../utils/image_mappings.dart'; // <--- 導入 image_mappings.dart
@@ -10,6 +12,7 @@ import 'package:logging/logging.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart'; // <--- 導入頁面指示器
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart'; // <--- 導入交錯動畫套件
 import '../utils/haptic_feedback_utils.dart'; // <--- 導入
+import 'dart:io'; // <--- 為了使用 SocketException
 
 final _log = Logger('RecommendationPage');
 
@@ -35,18 +38,28 @@ class _RecommendationPageState extends State<RecommendationPage> {
   List<RecipeListItem> _recommendedRecipes = [];
   bool _isLoadingRecipes = true;
   bool _isFetchingDetails = false;
-  // final String baseUrl = 'http://YOUR_COMPUTER_LOCAL_IP:8000/api'; // <--- 確認您的IP
-  final String baseUrl = 'http://172.20.10.5:8000/api'; // 使用您提供的IP範例
-
-  // --- 新增：用於 PageView 的 Controller ---
   final PageController _detailsPageController = PageController();
-  // --------------------------------------
 
   @override
   void initState() {
     super.initState();
-    _log.info("推薦頁收到查詢: '${widget.query}', 分類: ${widget.category ?? '無'}, 心情: ${widget.mood ?? '無'}");
-    _fetchRecommendations();
+    _log.info("RecommendationPage initState: query='${widget.query}', category='${widget.category}', mood='${widget.mood}'");
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fetchRecommendations();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant RecommendationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.query != widget.query ||
+        oldWidget.category != widget.category ||
+        oldWidget.mood != widget.mood) {
+      _log.info("Query parameters changed in didUpdateWidget. Fetching new recommendations.");
+      _fetchRecommendations();
+    } else {
+      _log.info("Query parameters have not changed. Skipping fetch in didUpdateWidget.");
+    }
   }
 
   @override
@@ -56,66 +69,118 @@ class _RecommendationPageState extends State<RecommendationPage> {
   }
 
   Future<void> _fetchRecommendations() async {
-    // ... (此函數的 API 呼叫和 JSON 解析邏輯保持不變) ...
     if (!mounted) return;
     setState(() { _isLoadingRecipes = true; _recommendedRecipes = []; });
+
+    final backendUrlService = Provider.of<BackendUrlService>(context, listen: false);
+    if (!backendUrlService.isInitialized || backendUrlService.currentUrl.isEmpty) {
+        _showErrorSnackBar("錯誤：後端 URL 未設定。請至設定頁面設定。");
+        if(mounted) setState(() => _isLoadingRecipes = false);
+        return;
+    }
+    final String baseUrl = '${backendUrlService.currentUrl}/api';
+    
     try {
       Map<String, String> queryParams = {
-        if (widget.query.isNotEmpty) 'q': widget.query,
-        if (widget.category != null && widget.category!.isNotEmpty) 'category': widget.category!,
-        if (widget.mood != null && widget.mood!.isNotEmpty) 'mood': widget.mood!,
+        'q': widget.query, // 即使為空也傳遞，讓後端判斷
+        if (widget.category != null) 'category': widget.category!,
+        if (widget.mood != null) 'mood': widget.mood!,
       };
+      // 移除 null 或空值，讓 URL 更乾淨
+      queryParams.removeWhere((key, value) => value == null || value.isEmpty);
+
       var uri = Uri.parse('$baseUrl/recipes/recommend').replace(queryParameters: queryParams);
-      _log.info("Fetching recommendations from: $uri");
+      _log.info("Fetching recommendations with params from: $uri");
       final response = await http.get(uri).timeout(const Duration(seconds: 20));
+      
       if (response.statusCode == 200) {
         final List<dynamic> jsonData = jsonDecode(utf8.decode(response.bodyBytes));
         if (mounted) {
           setState(() {
             _recommendedRecipes = jsonData.map((data) => RecipeListItem.fromJson(data)).toList();
-            _isLoadingRecipes = false;
           });
         }
       } else {
-        _log.severe("獲取推薦列表失敗: ${response.statusCode} - ${response.body}");
-        if (mounted) { setState(() => _isLoadingRecipes = false); ScaffoldMessenger.of(context).showSnackBar( SnackBar(content: Text('獲取推薦列表失敗: ${response.statusCode}')), ); }
+         _log.severe("獲取推薦列表失敗: ${response.statusCode} - ${response.body}");
+         _showErrorSnackBar('獲取推薦列表失敗: ${response.statusCode}');
       }
-    } on TimeoutException catch (e,s) {
-      _log.severe("獲取推薦列表超時", e, s);
-       if (mounted) { setState(() => _isLoadingRecipes = false); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('獲取推薦列表超時'))); }
-    } catch (e,s) {
+    } on SocketException catch(e, s) {
+      _log.severe("網路連線錯誤 (SocketException): $e", s);
+      _showErrorSnackBar("網路連線錯誤，請檢查 URL 是否正確或伺服器是否運行。");
+    } catch (e, s) {
       _log.severe("獲取推薦列表時發生錯誤", e, s);
-      if (mounted) { setState(() => _isLoadingRecipes = false); ScaffoldMessenger.of(context).showSnackBar( SnackBar(content: Text('獲取推薦列表錯誤: $e')), ); }
+      _showErrorSnackBar('獲取推薦列表錯誤: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingRecipes = false);
     }
   }
 
+  // --- 在 _handleRecipeTap 中加入詳細日誌 ---
   Future<void> _handleRecipeTap(RecipeListItem recipeListItem) async {
-    AppHaptics.lightClick(); // <--- 加入輕點擊回饋
-    // ... (此函數的 API 呼叫和 JSON 解析邏輯保持不變) ...
     if (!mounted || _isFetchingDetails) return;
     setState(() => _isFetchingDetails = true);
-    ScaffoldMessenger.of(context).showSnackBar( SnackBar(content: Text('正在獲取 ${recipeListItem.recipeName} 的詳細資訊...'), duration: const Duration(seconds: 1)), );
+    _log.info("--- Starting _handleRecipeTap for: ${recipeListItem.recipeName} ---");
+
+    final backendUrlService = Provider.of<BackendUrlService>(context, listen: false);
+    if (!backendUrlService.isInitialized || backendUrlService.currentUrl.isEmpty) {
+        _showErrorSnackBar("錯誤：後端 URL 未設定。請至設定頁面設定。");
+        if(mounted) setState(() => _isFetchingDetails = false);
+        return;
+    }
+    final String baseUrl = '${backendUrlService.currentUrl}/api';
+
     try {
+      // 1. 獲取食譜詳情
       final detailsUri = Uri.parse('$baseUrl/recipe/${Uri.encodeComponent(recipeListItem.recipeName)}');
       _log.info("Fetching details from: $detailsUri");
       final detailsResponse = await http.get(detailsUri).timeout(const Duration(seconds: 15));
-      Map<String, dynamic> detailsJson;
-      if (detailsResponse.statusCode == 200) { detailsJson = jsonDecode(utf8.decode(detailsResponse.bodyBytes)); }
-      else { throw Exception('無法獲取食譜詳情 (狀態碼: ${detailsResponse.statusCode})'); }
+      _log.info("Details API response status: ${detailsResponse.statusCode}");
+
+      if (detailsResponse.statusCode != 200) {
+        throw Exception('無法獲取食譜詳情 (狀態碼: ${detailsResponse.statusCode})');
+      }
+      final Map<String, dynamic> detailsJson = jsonDecode(utf8.decode(detailsResponse.bodyBytes));
+      _log.info("Details JSON parsed successfully.");
+
+      // 2. 獲取食譜步驟
       final stepsUri = Uri.parse('$baseUrl/recipe/${Uri.encodeComponent(recipeListItem.recipeName)}/steps');
       _log.info("Fetching steps from: $stepsUri");
       final stepsResponse = await http.get(stepsUri).timeout(const Duration(seconds: 15));
-      List<dynamic> stepsJson;
-      if (stepsResponse.statusCode == 200) { stepsJson = jsonDecode(utf8.decode(stepsResponse.bodyBytes)); }
-      else { throw Exception('無法獲取食譜步驟 (狀態碼: ${stepsResponse.statusCode})'); }
+      _log.info("Steps API response status: ${stepsResponse.statusCode}");
+
+      if (stepsResponse.statusCode != 200) {
+        throw Exception('無法獲取食譜步驟 (狀態碼: ${stepsResponse.statusCode})');
+      }
+      final List<dynamic> stepsJson = jsonDecode(utf8.decode(stepsResponse.bodyBytes));
+      _log.info("Steps JSON parsed successfully. Step count: ${stepsJson.length}");
+
+      // 3. 組合數據並顯示彈窗
       final RecipeDetails completeDetails = RecipeDetails.fromCombinedJson(detailsJson, stepsJson);
-      if (mounted) { setState(() => _isFetchingDetails = false); _showRecipeDetailsDialog(completeDetails); }
-    } on TimeoutException catch(e,s) {
-      _log.severe("獲取食譜詳情或步驟超時", e,s);
-      if (mounted) { setState(() => _isFetchingDetails = false); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('獲取食譜資料超時'))); }
-    } catch (e,s) {
-      _log.severe("獲取食譜詳情或步驟時發生錯誤", e,s);
-      if (mounted) { setState(() => _isFetchingDetails = false); ScaffoldMessenger.of(context).showSnackBar( SnackBar(content: Text('獲取食譜資料錯誤: $e')), ); }
+      _log.info("RecipeDetails object created. Ready to show dialog.");
+      
+      if (mounted) {
+        _showRecipeDetailsDialog(completeDetails);
+      }
+    } catch (e, s) {
+      _log.severe("獲取食譜詳情或步驟時發生錯誤", e, s);
+      if (mounted) {
+        _showErrorSnackBar('獲取食譜資料時出錯: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingDetails = false);
+        _log.info("--- Finished _handleRecipeTap ---");
+      }
+    }
+  }
+
+  // 新增一個顯示錯誤 SnackBar 的輔助方法
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.redAccent)
+      );
     }
   }
 

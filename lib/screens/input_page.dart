@@ -13,6 +13,8 @@ import 'package:video_player/video_player.dart'; // <--- 導入 video_player
 import '../utils/image_mappings.dart'; // 確保 chefAvatarPath 在這裡或直接定義
 import '../utils/keyword_mappings.dart'; // <--- 導入關鍵字映射
 import '../utils/haptic_feedback_utils.dart'; // <--- 導入
+import 'package:provider/provider.dart'; // <--- 導入 Provider
+import '../services/backend_url_service.dart'; // <--- 導入後端 URL 服務
 
 final _log = Logger('InputPage');
 
@@ -30,6 +32,7 @@ class InputPage extends StatefulWidget {
   @override
   State<InputPage> createState() => _InputPageState();
 }
+
 
 class _InputPageState extends State<InputPage> {
   final TextEditingController _textController = TextEditingController();
@@ -66,7 +69,6 @@ class _InputPageState extends State<InputPage> {
   final Random _random = Random(); // 用於產生隨機數
   // ------------------------------------
 
-  final String whisperBackendUrl = 'http://172.20.10.5:8000/recognize';
 
   @override
   void initState() {
@@ -290,11 +292,13 @@ class _InputPageState extends State<InputPage> {
       await _startRecording();
     }
   }
+
   Future<bool> _requestPermission() async {
      var status = await Permission.microphone.request();
      if (!status.isGranted) _log.warning("麥克風權限被拒絕");
      return status.isGranted;
   }
+
   Future<void> _startRecording() async {
     bool hasPermission = await _requestPermission();
     if (!hasPermission) { _showSnackBar("需要麥克風權限才能進行語音輸入"); return; }
@@ -311,6 +315,7 @@ class _InputPageState extends State<InputPage> {
       } else if (!isRecording && mounted){ _log.warning("無法開始錄音"); _showSnackBar("無法開始錄音"); }
     } catch (e, stackTrace) { _log.severe("錄音時發生錯誤", e, stackTrace); _showSnackBar("錄音失敗: $e"); if (mounted) setState(() => _isListening = false); }
   }
+
   Future<void> _stopRecordingAndSend() async {
      if (!_isListening || !mounted) return;
      setState(() => _isListening = false); _log.info("嘗試停止錄音...");
@@ -322,13 +327,28 @@ class _InputPageState extends State<InputPage> {
       await _sendAudioToBackend(_audioPath!);
     } catch (e, stackTrace) { _log.severe("停止錄音或發送時發生錯誤", e, stackTrace); _showSnackBar("處理錄音失敗: $e"); }
   }
+
   Future<void> _sendAudioToBackend(String filePath) async {
     final audioFile = File(filePath);
     if (!await audioFile.exists() || await audioFile.length() == 0) { _showSnackBar("錄音檔案無效"); _log.severe("錄音檔案無效: $filePath"); return; }
-    _log.info("準備上傳音訊檔案: $filePath 到 $whisperBackendUrl");
+    // *** 從 Provider 動態獲取 URL ***
+    // listen: false 表示此處只取一次值，不監聽其變化來重建 Widget
+    final backendUrlService = Provider.of<BackendUrlService>(context, listen: false);
+    if (backendUrlService.currentUrl.isEmpty) {
+        _showSnackBar("錯誤：後端 URL 未設定。請至設定頁面設定。");
+        return;
+    }
+    final String requestUrl = '${backendUrlService.currentUrl}/recognize';
+    // *******************************
+    
+    _log.info("準備上傳音訊檔案: $filePath 到 $requestUrl");
+
     try {
-      var request = http.MultipartRequest('POST', Uri.parse(whisperBackendUrl));
-      request.files.add(await http.MultipartFile.fromPath( 'audio_file', filePath, ));
+      var request = http.MultipartRequest('POST', Uri.parse(requestUrl));
+      request.files.add(await http.MultipartFile.fromPath(
+        'audio_file',
+        filePath,
+      ));
       var streamedResponse = await request.send().timeout(const Duration(seconds: 60));
       var response = await http.Response.fromStream(streamedResponse);
       _log.info("後端回應狀態碼: ${response.statusCode}");

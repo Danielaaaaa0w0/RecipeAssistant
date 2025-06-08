@@ -1,15 +1,15 @@
-// main.dart
+// main.dart (修改後)
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app.dart';
 import 'services/language_preference_service.dart';
+import 'services/backend_url_service.dart'; // <--- 導入新的服務
 import 'package:logging/logging.dart';
-// import 'utils/haptic_feedback_utils.dart'; // 不再需要在 main 中 init
 
-void main() { // 不再需要 async
-  WidgetsFlutterBinding.ensureInitialized(); // 確保 Flutter 綁定已初始化
-
-  // 初始化日誌 (保持不變)
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 初始化日誌
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     debugPrint('${record.time}: [${record.level.name}] ${record.loggerName}: ${record.message}');
@@ -17,12 +17,11 @@ void main() { // 不再需要 async
     if (record.stackTrace != null) debugPrint('StackTrace: ${record.stackTrace}');
   });
 
-  // await AppHaptics.init(); // <--- 移除這一行
-
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => LanguagePreferenceService()),
+        ChangeNotifierProvider(create: (_) => BackendUrlService()), // <--- 註冊新的服務
       ],
       child: const MyApp(),
     ),

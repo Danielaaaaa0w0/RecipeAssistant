@@ -2,9 +2,7 @@
 
 // 心情選項 (與 InputPage 中的 _moods 列表對應，作為標準值)
 // 這個列表也可以從外部（例如 LanguagePreferenceService 或其他設定檔）獲取，如果選項會動態變化
-final List<String> standardMoods = [
-  "低落", "疲憊", "放鬆", "快樂", "焦慮", "懷舊", "忙碌"
-];
+final List<String> standardMoods = ["低落", "疲憊", "放鬆", "快樂", "焦慮", "懷舊", "忙碌"];
 
 // 心情關鍵字映射
 // 鍵 (Key): 使用者可能說出的詞彙或字串片段 (建議都用小寫以便不區分大小寫匹配)
@@ -17,6 +15,7 @@ final Map<String, String> moodKeywords = {
   "沮喪": "低落",
   "傷心": "低落",
   "心情不好": "低落",
+  "心情不太好": "低落",
   "sad": "低落", // 英文也可以考慮
   "blue": "低落",
 
@@ -64,9 +63,7 @@ final Map<String, String> moodKeywords = {
 };
 
 // 分類選項 (與 InputPage 中的 _categories 列表對應)
-final List<String> standardCategories = [
-  "家常菜", "甜點", "異國風情", "湯品", "健康輕食"
-];
+final List<String> standardCategories = ["家常菜", "甜點", "異國風情", "湯品", "健康輕食"];
 
 // 分類關鍵字映射
 final Map<String, String> categoryKeywords = {
@@ -104,20 +101,23 @@ final Map<String, String> categoryKeywords = {
 };
 
 // 輔助函數：從輸入文本中提取第一個匹配的標準選項
-String? extractKeyword(String inputText, Map<String, String> keywordsMap, List<String> standardOptions) {
+String? extractKeyword(String inputText, Map<String, String> keywordsMap,
+    List<String> standardOptions) {
   if (inputText.isEmpty) return null;
   String lowerInput = inputText.toLowerCase(); // 轉換為小寫進行不區分大小寫匹配
 
   // 優先完全匹配標準選項 (如果用戶直接說出或選擇了標準詞)
   for (String option in standardOptions) {
-    if (lowerInput.contains(option.toLowerCase())) { // 也將標準選項轉為小寫比較
+    if (lowerInput.contains(option.toLowerCase())) {
+      // 也將標準選項轉為小寫比較
       return option;
     }
   }
 
   // 如果沒有完全匹配標準選項，再遍歷關鍵字
   for (String keyword in keywordsMap.keys) {
-    if (lowerInput.contains(keyword.toLowerCase())) { // 關鍵字也轉小寫
+    if (lowerInput.contains(keyword.toLowerCase())) {
+      // 關鍵字也轉小寫
       return keywordsMap[keyword]; // 返回對應的標準選項
     }
   }

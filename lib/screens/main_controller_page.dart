@@ -1,11 +1,12 @@
-// lib/screens/main_controller_page.dart
+// lib/screens/main_controller_page.dart (修改後)
 import 'package:flutter/material.dart';
 import 'input_page.dart';
 import 'recommendation_page.dart';
 import 'ar_page.dart';
 import 'settings_page.dart';
-import '../models/recipe_details.dart'; // <--- 導入模型
+import '../models/recipe_details.dart';
 import 'package:logging/logging.dart';
+import '../utils/haptic_feedback_utils.dart'; // 導入觸覺回饋
 
 final _log = Logger('MainControllerPage');
 
@@ -23,64 +24,9 @@ class _MainControllerPageState extends State<MainControllerPage> {
   String _currentQuery = "";
   String? _currentCategory;
   String? _currentMood;
-
-  // --- 新增：儲存要傳遞給 ARPage 的食譜詳情 (包含步驟) ---
   RecipeDetails? _recipeForAR;
-  // ----------------------------------------------------
 
-  final List<String> _pageTitles = ['查詢食譜', '為您推薦', 'AR 食譜步驟', '設定']; // AR 頁標題更新
-  bool _isPageViewScrollable = false;
-
-  // 從 InputPage 收集查詢條件，並跳轉到 RecommendationPage
-  void _handleSearchSubmitted(String query, String? category, String? mood) {
-    _log.info("Search submitted: Query='$query', Category='$category', Mood='$mood'");
-    setState(() {
-      _currentQuery = query;
-      _currentCategory = category;
-      _currentMood = mood;
-      _recipeForAR = null; // 清除之前的 AR 食譜數據
-    });
-    if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        1, // RecommendationPage 的索引
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-      WidgetsBinding.instance.addPostFrameCallback((_) { // 確保在 frame 結束後更新
-        if (mounted) {
-           setState(() {
-             _currentPageIndex = 1;
-             _isPageViewScrollable = false; // 到推薦頁後，先禁止左右滑動 (點擊觸發去AR)
-           });
-        }
-      });
-    }
-  }
-
-  // --- 新增：從 RecommendationPage 接收選中的食譜，並跳轉到 ARPage ---
-  void _handleStartAR(RecipeDetails recipeDetails) {
-    _log.info("Starting AR for recipe: ${recipeDetails.recipeName}");
-    setState(() {
-      _recipeForAR = recipeDetails; // 儲存食譜數據
-    });
-    if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        2, // ARPage 的索引
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
-       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-           setState(() {
-             _currentPageIndex = 2;
-             _isPageViewScrollable = true; // 進入 AR 頁後，允許與 Settings 頁滑動
-           });
-        }
-      });
-    }
-  }
-  // --------------------------------------------------------------
-
+  final List<String> _pageTitles = ['查詢食譜', '為您推薦', 'AR 食譜步驟', '設定'];
 
   @override
   void dispose() {
@@ -88,56 +34,113 @@ class _MainControllerPageState extends State<MainControllerPage> {
     super.dispose();
   }
 
+  void _handleSearchSubmitted(String query, String? category, String? mood) {
+    _log.info("Search submitted: Query='$query', Category='$category', Mood='$mood'");
+    if (!mounted) return;
+    setState(() {
+      _currentQuery = query;
+      _currentCategory = category;
+      _currentMood = mood;
+    });
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(1, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+    }
+  }
+
+  void _handleStartAR(RecipeDetails recipeDetails) {
+    _log.info("Starting AR for recipe: ${recipeDetails.recipeName}");
+    if (!mounted) return;
+    setState(() { _recipeForAR = recipeDetails; });
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(2, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+    }
+  }
+  
+  void _onPageChanged(int index) {
+    if (!mounted) return;
+    setState(() { _currentPageIndex = index; });
+  }
+
+  void _onBottomNavTapped(int index) {
+    AppHaptics.lightClick();
+    if (!mounted) return;
+    _pageController.jumpToPage(index);
+    setState(() { _currentPageIndex = index; });
+  }
+
+  void _navigateToSettings() {
+    AppHaptics.lightClick();
+    _onBottomNavTapped(3); // 跳轉到設定頁面 (索引為3)
+  }
+
   @override
   Widget build(BuildContext context) {
-    Widget? appBar;
-    if (_currentPageIndex == 0) {
-      appBar = AppBar( title: Text(_pageTitles[_currentPageIndex]), );
-    } else if (_currentPageIndex == 1) { // RecommendationPage
-       appBar = AppBar(
-         title: Text(_pageTitles[_currentPageIndex]),
-         leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              _pageController.animateToPage(0, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
-              WidgetsBinding.instance.addPostFrameCallback((_) { if(mounted) { setState(() { _currentPageIndex = 0; _isPageViewScrollable = false; }); }});
-            },
-          ),
-        );
-    } else if (_currentPageIndex == 2) { // ARPage
-       appBar = null; // ARPage 通常不需要 AppBar，或可以自定義
-    } else { // SettingsPage
-       appBar = AppBar( title: Text(_pageTitles[_currentPageIndex]), automaticallyImplyLeading: false, );
+    PreferredSizeWidget? appBar;
+    
+    // --- 修改 AppBar，加入設定按鈕 ---
+    List<Widget> actions = [];
+    // 在 InputPage 和 RecommendationPage 顯示設定按鈕
+    if (_currentPageIndex == 0 || _currentPageIndex == 1) {
+      actions.add(
+        IconButton(
+          icon: const Icon(Icons.settings_outlined),
+          tooltip: '設定',
+          onPressed: _navigateToSettings,
+        )
+      );
     }
+    
+    if (_currentPageIndex == 2) { // ARPage
+      appBar = null;
+    } else {
+      appBar = AppBar(
+        title: Text(_pageTitles[_currentPageIndex]),
+        leading: _currentPageIndex == 1
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  _pageController.animateToPage(0, duration: const Duration(milliseconds: 400), curve: Curves.easeInOut);
+                },
+              )
+            : null,
+        automaticallyImplyLeading: false,
+        actions: actions.isNotEmpty ? actions : null,
+      );
+    }
+    // --- 結束修改 ---
 
-    ScrollPhysics pageViewPhysics;
-    if (_currentPageIndex <= 1) { // InputPage, RecommendationPage 禁止左右滑動
-      pageViewPhysics = const NeverScrollableScrollPhysics();
-    } else { // ARPage, SettingsPage 允許左右滑動
-      pageViewPhysics = const PageScrollPhysics();
-    }
+    final bool isPageViewScrollable = _currentPageIndex >= 2;
 
     return Scaffold(
-      appBar: appBar as PreferredSizeWidget?,
+      appBar: appBar,
       body: PageView(
         controller: _pageController,
-        physics: pageViewPhysics,
-        onPageChanged: (index) {
-          if (index > 1 && _isPageViewScrollable) { // 只在 AR 和 Settings 之間滑動時更新
-             setState(() { _currentPageIndex = index; });
-          }
-        },
+        physics: isPageViewScrollable
+            ? const PageScrollPhysics()
+            : const NeverScrollableScrollPhysics(),
+        onPageChanged: _onPageChanged,
         children: <Widget>[
           InputPage(onComplete: _handleSearchSubmitted),
           RecommendationPage(
             query: _currentQuery,
             category: _currentCategory,
             mood: _currentMood,
-            onRecipeSelectedForAR: _handleStartAR, // <--- 傳遞新的回呼
+            onRecipeSelectedForAR: _handleStartAR,
           ),
-          ARPage(selectedRecipe: _recipeForAR), // <--- 傳遞選中的食譜數據
+          ARPage(selectedRecipe: _recipeForAR),
           const SettingsPage(),
         ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentPageIndex,
+        onTap: _onBottomNavTapped,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.search), label: '查詢'),
+          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '推薦'),
+          BottomNavigationBarItem(icon: Icon(Icons.view_in_ar), label: 'AR'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: '設定'),
+        ],
+        type: BottomNavigationBarType.fixed,
       ),
     );
   }
