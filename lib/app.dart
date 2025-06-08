@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'screens/main_controller_page.dart'; // 導入主控制器頁面
 import 'screens/welcome_page.dart';     // <--- 導入 WelcomePage
 
 class MyApp extends StatelessWidget {
