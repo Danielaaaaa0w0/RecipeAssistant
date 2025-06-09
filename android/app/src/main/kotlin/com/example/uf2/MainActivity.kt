@@ -1,4 +1,4 @@
-package com.example.uf2
+package com.example.recipeassistant
 
 import io.flutter.embedding.android.FlutterActivity
 

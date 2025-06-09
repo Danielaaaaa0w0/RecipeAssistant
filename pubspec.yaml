@@ -24,7 +24,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.6
   flutter_unity_widget: ^2022.2.0
-
+  flutter_launcher_icons: ^0.13.1
   # --- 加入新版 App 需要的依賴項 ---
   # (以下版本號是目前的穩定版，通常能相容，若 pub get 報錯再調整)
   http: ^1.2.1
@@ -76,3 +76,8 @@ flutter:
     - assets/audio/recipe_steps/蒜香花椰菜/
     - assets/audio/recipe_steps/草莓冰淇淋/
     - assets/audio/recipe_steps/番茄炒蛋/
+
+
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/icon/icon.png"
