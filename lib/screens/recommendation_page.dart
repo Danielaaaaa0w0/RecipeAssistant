@@ -86,8 +86,6 @@ class _RecommendationPageState extends State<RecommendationPage> {
         if (widget.category != null) 'category': widget.category!,
         if (widget.mood != null) 'mood': widget.mood!,
       };
-      // 移除 null 或空值，讓 URL 更乾淨
-      queryParams.removeWhere((key, value) => value == null || value.isEmpty);
 
       var uri = Uri.parse('$baseUrl/recipes/recommend').replace(queryParameters: queryParams);
       _log.info("Fetching recommendations with params from: $uri");
