@@ -15,6 +15,7 @@ import '../utils/keyword_mappings.dart'; // <--- 導入關鍵字映射
 import '../utils/haptic_feedback_utils.dart'; // <--- 導入
 import 'package:provider/provider.dart'; // <--- 導入 Provider
 import '../services/backend_url_service.dart'; // <--- 導入後端 URL 服務
+import '../widgets/grid_paper_background.dart'; // <--- 導入新的背景 Widget
 
 final _log = Logger('InputPage');
 
@@ -59,7 +60,7 @@ class _InputPageState extends State<InputPage> {
 
   // --- 新增：預設的菜名列表 (已移除 "的做法" 後綴) ---
   final List<String> _presetRecipeNames = [
-    "奶油蘑菇濃湯", "咖啡椰奶凍", "草莓冰淇淋", "蒜香花椰菜", "蛋炒飯",
+    "奶油蘑菇濃湯", "咖啡椰奶凍", "蒜香花椰菜", "蛋炒飯",
     "美式炒蛋", "番茄牛肉蛋花湯", "涼拌小黃瓜", "日式肥牛丼飯", "番茄炒蛋"
   ];
   // -------------------------------------------------
@@ -86,20 +87,19 @@ class _InputPageState extends State<InputPage> {
     super.dispose();
   }
 
-  // --- 新增：隨機選取菜名的方法 ---
+  // --- 修改：食譜 Chips 數量調整 ---
   void _updateRandomizedRecipeNames() {
-    if (_presetRecipeNames.length <= 5) {
-      // 如果總數少於等於5，則全部顯示
+    final int countToShow = 3; // <--- 改為 3
+    if (_presetRecipeNames.length <= countToShow) {
       _randomizedRecipeNames = List.from(_presetRecipeNames);
     } else {
-      // 隨機選取5個不重複的菜名
-      List<String> tempList = List.from(_presetRecipeNames); // 複製一份以進行操作
-      tempList.shuffle(_random); // 打亂列表
-      _randomizedRecipeNames = tempList.sublist(0, 5); // 取前5個
+      List<String> tempList = List.from(_presetRecipeNames);
+      tempList.shuffle(_random);
+      _randomizedRecipeNames = tempList.sublist(0, countToShow); // <--- 改為 3
     }
-    _log.info("Randomized recipe names for chips: $_randomizedRecipeNames");
+    _log.info("Randomized $countToShow recipe names for chips: $_randomizedRecipeNames");
   }
-  // --------------------------------
+  // ---------------------------------
 
   void _initializeStage(InputStage stage) {
     _log.info("Initializing stage: $stage");
@@ -508,134 +508,158 @@ class _InputPageState extends State<InputPage> {
     return Container( margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 10), padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12), decoration: BoxDecoration( color: Colors.orange[50], borderRadius: BorderRadius.circular(15), boxShadow: [ BoxShadow( color: Colors.grey.withOpacity(0.3), spreadRadius: 1, blurRadius: 3, offset: const Offset(0, 2), ), ], ), child: Text( text, textAlign: TextAlign.center, style: TextStyle(fontSize: 17, color: Colors.deepOrange[800], height: 1.5), ), );
   }
 
-
-@override
-Widget build(BuildContext context) {
-  final Color? defaultIconForegroundColor = Theme.of(context).iconButtonTheme.style?.foregroundColor?.resolve({});
-  return GestureDetector(
-     onTap: () => FocusScope.of(context).unfocus(),
-     child: Scaffold(
-       body: SafeArea(
-         child: Center(
-           child: SingleChildScrollView(
-             padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 20.0),
-             child: Column(
-               mainAxisAlignment: MainAxisAlignment.center,
-               crossAxisAlignment: CrossAxisAlignment.center,
-               children: <Widget>[
-                 // --- Avatar 影片區域，移除 AnimatedSwitcher ---
-                 GestureDetector(
-                   // key: ValueKey<String?>(_currentVideoPath ?? 'no_video_avatar'), // 如果沒有 AnimatedSwitcher，這個 key 的作用減小，但保留也無妨
-                   onTap: _replayCurrentVideo,
-                   child: SizedBox(
-                     width: 200,
-                     height: 200,
-                     child: _videoController != null && _videoController!.value.isInitialized
-                         ? AspectRatio(
-                             aspectRatio: _videoController!.value.aspectRatio,
-                             child: VideoPlayer(_videoController!),
-                           )
-                         : Container( // 影片載入中、失敗或無影片時的佔位符
-                             width: 100, height: 100,
-                             decoration: BoxDecoration(
-                               color: Colors.grey[200],
-                               borderRadius: BorderRadius.circular(15.0),
-                             ),
-                             child: Image.asset(
-                               chefAvatarPath, // 靜態備用圖片
-                               width: 100, height: 100, fit: BoxFit.cover,
-                               errorBuilder: (ctx, err, st) => Icon(Icons.person_rounded, size: 60, color: Colors.grey[400]),
-                             )
-                           ),
-                   ),
-                 ),
-                 // --- 結束 Avatar 影片區域修改 ---
-                 const SizedBox(height: 10),
-
-                 // 對話泡泡 (保持 AnimatedSwitcher)
-                 AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (Widget child, Animation<double> animation) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
-                    child: Container(
-                      key: ValueKey<String>(_avatarDialogue),
-                      child: _buildDialogueBubble(_avatarDialogue),
-                    )
-                 ),
-                 const SizedBox(height: 20),
-
-                  // --- 根據階段顯示對應的 Chips ---
-                  if (_currentStage == InputStage.askingMood) _buildMoodChips(),
-                  if (_currentStage == InputStage.askingQuery) _buildRecipeNameChips(), // <--- 呼叫 _buildRecipeNameChips
-                  if (_currentStage == InputStage.askingCategory) _buildCategoryChips(),
-                  // ----------------------------------
-                  // 如果是詢問菜名階段，並且菜名 Chips 已顯示，則不再顯示額外的提示文字
-                  if (_currentStage == InputStage.askingQuery && _randomizedRecipeNames.isEmpty) // 如果沒有隨機菜名 (理論上不會，除非 _presetRecipeNames 為空)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 15.0),
-                      child: Text("您可以直接說出菜名，或留空按下一步", style: TextStyle(color: Colors.grey[600])),
-                    ),
-                  const SizedBox(height: 15),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _textController,
-                            decoration: InputDecoration(
-                              hintText: _currentStage == InputStage.askingMood
-                                  ? '請說出或選擇心情...'
-                                  : _currentStage == InputStage.askingQuery
-                                      ? '請說出或輸入想做的料理...'
-                                      : '請說出或選擇分類...',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(25.0)),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-                            ),
-                            textInputAction: _currentStage == InputStage.askingCategory ? TextInputAction.done : TextInputAction.next,
-                            onSubmitted: (_) => _handleNextOrComplete(),
-                          ),
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          const Positioned.fill(
+            child: GridPaperBackground(),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 25.0, vertical: 20.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20.0),
+                      child: GestureDetector(
+                        onTap: _replayCurrentVideo,
+                        child: SizedBox(
+                          width: 200,
+                          height: 200,
+                          child: _videoController != null && _videoController!.value.isInitialized
+                              ? AspectRatio(
+                                  aspectRatio: _videoController!.value.aspectRatio,
+                                  child: VideoPlayer(_videoController!),
+                                )
+                              : Container(
+                                  width: 100, height: 100,
+                                  decoration: BoxDecoration(color: Colors.grey[200]),
+                                  child: Image.asset(
+                                    chefAvatarPath, // 靜態備用圖片
+                                    width: 100, height: 100, fit: BoxFit.cover,
+                                    errorBuilder: (ctx, err, st) => Icon(Icons.person_rounded, size: 60, color: Colors.grey[400]),
+                                  )
+                                ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: Icon(_isListening ? Icons.stop_circle_outlined : Icons.mic_rounded),
-                          iconSize: 32,
-                          tooltip: _isListening ? '停止錄音' : '開始語音輸入',
-                          onPressed: _toggleRecording,
-                          style: IconButton.styleFrom(foregroundColor: _isListening ? Colors.redAccent : defaultIconForegroundColor, backgroundColor: _isListening ? Colors.red.withOpacity(0.1) : Colors.orange.withOpacity(0.15), padding: const EdgeInsets.all(15), shape: const CircleBorder()),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 25),
-                  // --- 下一步/完成按鈕，可以考慮為按鈕本身或其文字加入動畫 ---
-                  ElevatedButton(
-                    onPressed: _handleNextOrComplete,
-                    style: ElevatedButton.styleFrom( padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15), textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold) ),
-                    // 按鈕文字也用 AnimatedSwitcher
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      transitionBuilder: (Widget child, Animation<double> animation) {
-                        return FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child));
-                      },
-                      child: Text(
-                        _currentStage == InputStage.askingCategory ? '完成搜尋' : '下一步',
-                        key: ValueKey<String>(_currentStage == InputStage.askingCategory ? '完成搜尋' : '下一步'), // Key 基於文字內容
                       ),
-                    )
-                  ),
-                  // ----------------------------------------------------
-                  const SizedBox(height: 30),
-               ],
-             ),
-           ),
-         ),
-       ),
-     ),
-   );
-}
+                    ),
+                    const SizedBox(height: 10),
+                    _buildDialogueBubble(_avatarDialogue),
+                    const SizedBox(height: 10),
+
+                    // --- 新增：「跳過」提示文字 ---
+                    AnimatedOpacity(
+                      opacity: _currentStage != InputStage.completed ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 300),
+                      child: Text(
+                        "（您可以直接按「下一步」跳過此問題）",
+                        style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      ),
+                    ),
+                    // ---------------------------
+                    const SizedBox(height: 10),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      transitionBuilder: (Widget child, Animation<double> animation) {
+                        final offsetAnimation = Tween<Offset>(begin: const Offset(0.0, 0.1), end: Offset.zero)
+                            .animate(CurvedAnimation(parent: animation, curve: Curves.easeOut));
+                        return FadeTransition(opacity: animation, child: SlideTransition(position: offsetAnimation, child: child));
+                      },
+                      child: Container(
+                        key: ValueKey<InputStage>(_currentStage),
+                        constraints: const BoxConstraints(minHeight: 120.0),
+                        alignment: Alignment.topCenter,
+                        child: _currentStage == InputStage.askingMood
+                            ? _buildMoodChips()
+                            : _currentStage == InputStage.askingCategory
+                                ? _buildCategoryChips()
+                                : _currentStage == InputStage.askingQuery
+                                    ? _buildRecipeNameChips()
+                                    : const SizedBox(height: 120.0),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _textController,
+                              decoration: InputDecoration(
+                                hintText: _currentStage == InputStage.askingMood ? '請說出或選擇心情...' : _currentStage == InputStage.askingQuery ? '請說出或輸入想做的料理...' : '請說出或選擇分類...',
+
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(25.0)),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                                // --- 修改：移除透明度，使用實色 ---
+                                filled: true,
+                                fillColor: Colors.white, // <-- 改為不透明的白色
+
+                                // -------------------------------
+                              ),
+                              textInputAction: _currentStage == InputStage.askingCategory ? TextInputAction.done : TextInputAction.next,
+                              onSubmitted: (_) => _handleNextOrComplete(),
+                              
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton(
+                            icon: Icon(_isListening ? Icons.stop_circle_outlined : Icons.mic_rounded),
+                            iconSize: 32,
+                            tooltip: _isListening ? '停止錄音' : '開始語音輸入',
+                            onPressed: _toggleRecording,
+                            style: IconButton.styleFrom(
+                              // --- 修改：移除透明度，使用實色 ---
+                              foregroundColor: _isListening ? Colors.redAccent :  Colors.deepOrange, // 根據錄音狀態改變顏色
+                              backgroundColor: Colors.white, // 使用白色實色背景
+                              shape: const CircleBorder(side: BorderSide(color: Colors.black12, width: 1)),
+                              elevation: 2, // 加一點陰影
+                              // -------------------------------
+                              padding: const EdgeInsets.all(15),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+                    // --- 下一步/完成按鈕，可以考慮為按鈕本身或其文字加入動畫 ---
+                    ElevatedButton(
+                      onPressed: _handleNextOrComplete,
+                      style: ElevatedButton.styleFrom( 
+                        // 使用您在 app.dart 中定義的 ElevatedButtonThemeData
+                        backgroundColor: Colors.deepOrange[700],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 15), 
+                        textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold) 
+                      ),
+                      // 按鈕文字也用 AnimatedSwitcher
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        transitionBuilder: (Widget child, Animation<double> animation) {
+                          return FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child));
+                        },
+                        child: Text(
+                          _currentStage == InputStage.askingCategory ? '完成搜尋' : '下一步',
+                          key: ValueKey<String>(_currentStage == InputStage.askingCategory ? '完成搜尋' : '下一步'), // Key 基於文字內容
+                        ),
+                      )
+                    ),
+                    // ----------------------------------------------------
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 }

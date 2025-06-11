@@ -8,6 +8,7 @@ import '../models/recipe_details.dart';
 import 'package:logging/logging.dart';
 import '../utils/haptic_feedback_utils.dart'; // 導入觸覺回饋
 
+
 final _log = Logger('MainControllerPage');
 
 class MainControllerPage extends StatefulWidget {
@@ -64,8 +65,22 @@ class _MainControllerPageState extends State<MainControllerPage> {
   void _onBottomNavTapped(int index) {
     AppHaptics.lightClick();
     if (!mounted) return;
+
+    // --- 修改：加入禁用 AR 頁面跳轉的邏輯 ---
+    if (index == 2 && _recipeForAR == null) {
+      // 如果目標是 AR 頁，但還沒有選定食譜
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('請先選擇一道食譜後，才能進入 AR 模式喔！'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return; // 阻止跳轉
+    }
+    // -------------------------------------
+
     _pageController.jumpToPage(index);
-    setState(() { _currentPageIndex = index; });
+    // onPageChanged 會處理 _currentPageIndex 的更新
   }
 
   void _navigateToSettings() {
@@ -134,11 +149,19 @@ class _MainControllerPageState extends State<MainControllerPage> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentPageIndex,
         onTap: _onBottomNavTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: '查詢'),
-          BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '推薦'),
-          BottomNavigationBarItem(icon: Icon(Icons.view_in_ar), label: 'AR'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: '設定'),
+        items: [
+          const BottomNavigationBarItem(icon: Icon(Icons.search), label: '查詢'),
+          const BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: '推薦'),
+          // --- 修改：根據狀態改變 AR 頁面圖示的顏色 ---
+          BottomNavigationBarItem(
+            icon: Icon(
+              Icons.view_in_ar,
+              color: _recipeForAR == null ? Colors.grey : null, // 如果未選食譜，圖示變灰色
+            ),
+            label: 'AR'
+          ),
+          // -----------------------------------------
+          const BottomNavigationBarItem(icon: Icon(Icons.settings), label: '設定'),
         ],
         type: BottomNavigationBarType.fixed,
       ),

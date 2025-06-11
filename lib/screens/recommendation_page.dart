@@ -410,21 +410,27 @@ class _RecommendationPageState extends State<RecommendationPage> {
                                             
                                             // --- 結束修改 ---
 
-                                            // 顯示心情標籤
+                                            // --- 修改：心情標籤的 Chip 樣式 ---
                                             if (recipeItem.moods.isNotEmpty)
-                                              Wrap(
-                                                spacing: 6.0, // 標籤之間的水平間距
-                                                runSpacing: 4.0, // 標籤換行後的垂直間距
-                                                children: recipeItem.moods.map((mood) {
-                                                  return Chip(
-                                                    label: Text(mood, style: const TextStyle(fontSize: 12)), // 心情標籤字體可以小一點
-                                                    backgroundColor: Colors.blue[50], // 給心情標籤一個背景色
-                                                    labelPadding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 0), // 調整 Chip 內邊距
-                                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, // 減小點擊區域
-                                                    visualDensity: VisualDensity.compact, // 更緊湊的視覺
-                                                  );
-                                                }).toList(),
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 6.0),
+                                                child: Wrap(
+                                                  spacing: 6.0,
+                                                  runSpacing: 4.0,
+                                                  children: recipeItem.moods.map((mood) {
+                                                    return Chip(
+                                                      label: Text(mood, style: const TextStyle(fontSize: 12, color: Colors.indigo)), // 深藍色文字
+                                                      backgroundColor: Colors.indigo.withOpacity(0.1), // 非常淡的藍色背景
+                                                      side: BorderSide(color: Colors.indigo.withOpacity(0.2)), // 柔和的邊框
+                                                      labelPadding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 0),
+                                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                      visualDensity: VisualDensity.compact,
+                                                    );
+                                                  }).toList(),
+                                                ),
                                               ),
+                                            // --- 結束修改 ---
+                                            
                                           ],
                                         ),
                                       ),

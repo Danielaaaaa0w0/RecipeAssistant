@@ -13,9 +13,11 @@ class BackendUrlService with ChangeNotifier {
     'http://140.116.115.198:8000',
   ];
   
-  // 預設 URL，例如第一個常用 IP
-  late String _currentUrl;
+  // --- 修改：提供一個初始預設值，而不是 late ---
+  String _currentUrl = '[http://172.20.10.5:8000](http://172.20.10.5:8000)'; // 我手機
+  // String _currentUrl = '[http://140.116.115.198:8000](http://140.116.115.198:8000)'; // 宿網
   bool _isInitialized = false;
+  // ------------------------------------------
 
   String get currentUrl => _currentUrl;
   bool get isInitialized => _isInitialized;
@@ -27,11 +29,12 @@ class BackendUrlService with ChangeNotifier {
   Future<void> _loadUrl() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // 從本地存儲讀取 URL，如果沒有，則保持初始設定的預設值
       _currentUrl = prefs.getString(_urlKey) ?? presetUrls.first;
       _log.info("Loaded backend URL: $_currentUrl");
     } catch (e, s) {
       _log.severe("Failed to load backend URL, using default.", e, s);
-      _currentUrl = presetUrls.first;
+      // 如果載入失敗，_currentUrl 仍然是我們初始設定的預設值
     } finally {
       _isInitialized = true;
       notifyListeners();
