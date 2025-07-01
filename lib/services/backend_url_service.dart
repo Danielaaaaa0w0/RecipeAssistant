@@ -7,16 +7,18 @@ final _log = Logger('BackendUrlService');
 
 class BackendUrlService with ChangeNotifier {
   static const String _urlKey = 'backend_url';
-  
+
   // 您的常用 IP 預設列表
   final List<String> presetUrls = const [
-    'http://140.116.115.198:8000', // <--- 將這個設為第一個，作為預設
+    'http://140.116.245.149:8000', // <--- 將這個設為第一個，作為預設
+    'http://192.168.211.23:8000',
+    'http://140.116.115.198:8000',
     'http://172.20.10.5:8000',
   ];
-  
+
   // --- 核心修改：移除 late 並提供一個初始預設值 ---
   // App 啟動時將立即使用此 URL。
-  String _currentUrl = 'http://140.116.115.198:8000'; // 直接設定您想要的預設值
+  String _currentUrl = 'http://140.116.245.149:8000'; // 直接設定您想要的預設值
   bool _isInitialized = false;
   // ----------------------------------------------
 
@@ -64,7 +66,7 @@ class BackendUrlService with ChangeNotifier {
       _log.info("Backend URL changed to: $trimmedUrl");
       notifyListeners();
     } catch (e, s) {
-       _log.severe("Failed to save backend URL", e, s);
+      _log.severe("Failed to save backend URL", e, s);
     }
   }
 }
